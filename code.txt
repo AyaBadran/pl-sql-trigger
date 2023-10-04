@@ -1,0 +1,50 @@
+set serveroutput on;
+DECLARE
+   v_pk_column varchar2(100);
+   v_max_id NUMBER;
+   CURSOR table_cursor IS 
+select UTC.TABLE_NAME, UCC.COLUMN_NAME
+from USER_TAB_COLUMNS UTC , user_objects UO , user_constraints UC , user_cons_columns UCC
+where UTC.DATA_TYPE ='NUMBER'
+AND  UO.object_type ='TABLE' 
+and UCC.TABLE_NAME = UO.OBJECT_NAME
+and  UC.CONSTRAINT_TYPE = 'P' 
+and UC.constraint_name = UCC.CONSTRAINT_NAME
+AND UC.TABLE_NAME = UCC.TABLE_NAME
+AND UCC.TABLE_NAME=UTC.TABLE_NAME
+AND UTC.column_name=UCC.column_name
+ ;
+BEGIN 
+   FOR tabl IN table_cursor LOOP
+      BEGIN
+         EXECUTE IMMEDIATE 'DROP SEQUENCE ' || tabl.table_name || '_SEQ';
+      EXCEPTION
+         WHEN OTHERS THEN
+         NULL;
+      END;
+      dbms_output.put_line(tabl.table_name || '   '||  tabl.COLUMN_NAME);
+          v_pk_column := 'SELECT MAX(' || tabl.COLUMN_NAME || ') + 1 FROM ' || tabl.table_name;
+          EXECUTE IMMEDIATE v_pk_column INTO v_max_id;
+         dbms_output.put_line(v_max_id);
+           EXECUTE IMMEDIATE  'CREATE SEQUENCE ' || tabl.table_name || '_SEQ START WITH ' || v_max_id ;
+   
+   
+   
+          EXECUTE IMMEDIATE  'CREATE OR REPLACE TRIGGER ' || tabl.table_name || '_TRG 
+                 BEFORE INSERT ON ' || tabl.table_name || '
+                 FOR EACH ROW
+                 BEGIN
+                   IF :new.' ||  tabl.column_name || ' IS NULL THEN 
+                     SELECT ' || tabl.table_name || '_SEQ.NEXTVAL INTO :new.' || tabl.column_name || ' FROM DUAL;
+                   END IF;
+                 END;';
+   
+     end loop;
+END;
+/*
+INSERT INTO emps (employee_id, employee_name,employee_salary)
+VALUES (null  ,'ayaaa', 5000);
+select * from emps;
+INSERT INTO emps ( employee_name,employee_salary)
+VALUES ('badran', 5000);
+ */                                   
